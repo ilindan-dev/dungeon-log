@@ -1,0 +1,123 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/ilindan-dev/dungeon-log
+
+linters:
+  default: none
+
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+
+    - bodyclose
+    - sqlclosecheck
+    - rowserrcheck
+    - copyloopvar
+    - makezero
+    - prealloc
+
+    - gosec
+    - gocritic
+    - errorlint
+    - nilerr
+    - nilnil
+    - revive
+    - lll
+    - gocyclo
+    - gocognit
+    - funlen
+    - nestif
+    - depguard
+
+  settings:
+    lll:
+      line-length: 120
+      tab-width: 4
+    gocyclo:
+      min-complexity: 10
+    gocognit:
+      min-complexity: 15
+    nestif:
+      min-complexity: 4
+    funlen:
+      lines: 70
+      statements: 40
+    depguard:
+      rules:
+        core-domain:
+          files:
+            - "**/internal/core/domain/**.go"
+          deny:
+            - pkg: "github.com/ilindan-dev/dungeon-log/internal/core/ports"
+              desc: "Domain is pure. It cannot depend on ports."
+            - pkg: "github.com/ilindan-dev/dungeon-log/internal/service"
+              desc: "Domain is pure. It cannot depend on the service layer."
+            - pkg: "github.com/ilindan-dev/dungeon-log/internal/adapters"
+              desc: "Domain is pure. Direct adapter imports are strictly forbidden."
+        core-ports:
+          files:
+            - "**/internal/core/ports/**.go"
+          deny:
+            - pkg: "github.com/ilindan-dev/dungeon-log/internal/service"
+              desc: "Ports are contracts. They must not depend on the service implementation."
+            - pkg: "github.com/ilindan-dev/dungeon-log/internal/adapters"
+              desc: "Ports are abstractions. Infrastructure details (adapters) are forbidden."
+        service:
+          files:
+            - "**/internal/service/**.go"
+          deny:
+            - pkg: "github.com/ilindan-dev/dungeon-log/internal/adapters"
+              desc: "Hexagon breach! Service must only use ports, never concrete adapters."
+        adapters:
+          files:
+            - "**/internal/adapters/**.go"
+          deny:
+            - pkg: "github.com/ilindan-dev/dungeon-log/internal/service"
+              desc: "Adapters implement ports, they don't invoke the service directly."
+            - pkg: "github.com/ilindan-dev/dungeon-log/internal/adapters/parser"
+              desc: "Adapters should be decoupled from each other."
+            - pkg: "github.com/ilindan-dev/dungeon-log/internal/adapters/reporter"
+              desc: "Adapters should be decoupled from each other."
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+
+    revive:
+      enable-default-rules: true
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+
+  exclusions:
+    generated: lax
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+          - bodyclose
+          - prealloc
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
