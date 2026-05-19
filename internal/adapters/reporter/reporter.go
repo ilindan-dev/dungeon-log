@@ -79,23 +79,9 @@ func (r *BaseReporter) PrintFinalReport(players []*domain.Player) error {
 	}
 
 	for _, p := range players {
-		timeSpent := p.LeaveTime.Sub(p.EnterTime)
-		if p.State == domain.StateFail && !p.DeathTime.IsZero() {
-			timeSpent = p.DeathTime.Sub(p.EnterTime)
-		}
-
-		var totalFloorTime time.Duration
-		for _, d := range p.FloorClearTimes {
-			totalFloorTime += d
-		}
-		avgFloorTime := time.Duration(0)
-		if len(p.FloorClearTimes) > 0 {
-			avgFloorTime = totalFloorTime / time.Duration(len(p.FloorClearTimes))
-		}
-
 		statStr := fmt.Sprintf("[%s, %s, %s]",
-			formatDuration(timeSpent),
-			formatDuration(avgFloorTime),
+			formatDuration(p.TimeSpent),
+			formatDuration(p.AvgFloorClearTime),
 			formatDuration(p.BossKillTime),
 		)
 
