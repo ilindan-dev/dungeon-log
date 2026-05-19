@@ -1,9 +1,11 @@
 package service
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"time"
 
@@ -58,6 +60,10 @@ func (s *DungeonService) Run() error {
 
 		finalPlayers = append(finalPlayers, p)
 	}
+
+	slices.SortFunc(finalPlayers, func(a, b *domain.Player) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
 
 	return s.reporter.PrintFinalReport(finalPlayers)
 }
