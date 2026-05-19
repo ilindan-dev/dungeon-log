@@ -13,4 +13,7 @@ type Reporter interface {
 
 	// PrintFinalReport outputs the summarized results for all participants.
 	PrintFinalReport(players []*domain.Player) error
+
+	// EmitIncoming echoes a successfully processed player action.
+	EmitIncoming(event domain.Event) error
 }
