@@ -31,7 +31,7 @@ func TestIsTerminalState(t *testing.T) {
 }
 
 func TestIsFloorCleared(t *testing.T) {
-	cfg := &domain.Config{Floors: 2, Monsters: 3}
+	cfg := &domain.Config{Floors: 3, Monsters: 3}
 	s := &DungeonService{cfg: cfg}
 
 	tests := []struct {
@@ -66,7 +66,7 @@ func TestIsFloorCleared(t *testing.T) {
 
 //nolint:funlen,gocognit // Table-driven tests inherently have higher length and complexity metrics
 func TestUpdateCurrentFloorTime(t *testing.T) {
-	cfg := &domain.Config{Floors: 2, Monsters: 2}
+	cfg := &domain.Config{Floors: 3, Monsters: 2}
 	s := &DungeonService{cfg: cfg}
 
 	baseTime := time.Date(2026, 1, 1, 14, 0, 0, 0, time.UTC)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"time"
 
 	"github.com/ilindan-dev/dungeon-log/internal/core/domain"
 	"github.com/ilindan-dev/dungeon-log/internal/core/ports"
@@ -51,6 +52,10 @@ func (s *DungeonService) Run() error {
 		if p.State == domain.StateOutside || p.State == domain.StateInDungeon {
 			p.State = domain.StateFail
 		}
+
+		// Вся сложная математика теперь изолирована
+		s.calculateFinalMetrics(p)
+
 		finalPlayers = append(finalPlayers, p)
 	}
 
@@ -78,9 +83,11 @@ func (s *DungeonService) dispatch(e domain.Event) {
 			_ = s.handleRegistration(nil, e)
 		} else {
 			s.players[e.PlayerID] = &domain.Player{
-				ID:     e.PlayerID,
-				State:  domain.StateDisqual,
-				Health: 100,
+				ID:              e.PlayerID,
+				State:           domain.StateDisqual,
+				Health:          100,
+				MonstersKilled:  make([]int, s.cfg.Floors+2),
+				FloorClearTimes: make([]time.Duration, s.cfg.Floors+2),
 			}
 			_ = s.reporter.EmitOutgoing(e.Time, domain.OutEventDisqualified, e.PlayerID, "")
 		}
@@ -91,9 +98,12 @@ func (s *DungeonService) dispatch(e domain.Event) {
 		return
 	}
 
-	_ = s.reporter.EmitIncoming(e)
-
 	err := s.handleStateTransition(player, e)
+
+	if err == nil || errors.Is(err, domain.ErrPlayerDead) {
+		_ = s.reporter.EmitIncoming(e)
+	}
+
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidMove):
@@ -104,6 +114,40 @@ func (s *DungeonService) dispatch(e domain.Event) {
 		case errors.Is(err, domain.ErrDisqualified):
 			_ = s.reporter.EmitOutgoing(e.Time, domain.OutEventDisqualified, e.PlayerID, "")
 			player.State = domain.StateDisqual
+		}
+	}
+}
+
+// calculateFinalMetrics computes the total time spent and average floor clear time
+// for a player at the end of the trial.
+func (s *DungeonService) calculateFinalMetrics(p *domain.Player) {
+	if !p.EnterTime.IsZero() {
+		switch {
+		case p.State == domain.StateFail && !p.DeathTime.IsZero():
+			p.TimeSpent = p.DeathTime.Sub(p.EnterTime)
+		case p.LeaveTime.IsZero():
+			deadline := s.cfg.OpenAt.Add(s.cfg.Duration)
+			p.TimeSpent = deadline.Sub(p.EnterTime)
+		default:
+			p.TimeSpent = p.LeaveTime.Sub(p.EnterTime)
+		}
+	}
+
+	var totalFloorTime time.Duration
+	var clearedFloors int
+	regularFloors := s.cfg.Floors - 1
+
+	if regularFloors > 0 && len(p.FloorClearTimes) > regularFloors {
+		for i := 1; i <= regularFloors; i++ {
+			if s.isFloorCleared(p, i) {
+				totalFloorTime += p.FloorClearTimes[i]
+				clearedFloors++
+			}
+		}
+		if clearedFloors > 0 {
+			p.AvgFloorClearTime = totalFloorTime / time.Duration(clearedFloors)
+		} else {
+			p.AvgFloorClearTime = 0
 		}
 	}
 }

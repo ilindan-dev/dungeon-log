@@ -12,7 +12,7 @@ import (
 func setupTestService() *DungeonService {
 	return &DungeonService{
 		cfg: &domain.Config{
-			Floors:   2,
+			Floors:   3,
 			Monsters: 2,
 		},
 		players: make(map[int]*domain.Player),
@@ -29,7 +29,7 @@ func TestHandleRegistrationAndEnter(t *testing.T) {
 	if err := s.handleRegistration(nil, evReg); err != nil {
 		t.Fatalf("unexpected error on registration: %v", err)
 	}
-	if p, exists := s.players[1]; !exists || p.State != domain.StateOutside || len(p.MonstersKilled) != 4 {
+	if p, exists := s.players[1]; !exists || p.State != domain.StateOutside || len(p.MonstersKilled) != s.cfg.Floors+2 {
 		t.Errorf("player not initialized correctly")
 	}
 
