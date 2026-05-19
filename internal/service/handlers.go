@@ -105,7 +105,7 @@ func (s *DungeonService) handlePrevFloor(p *domain.Player, e domain.Event) error
 // It prevents overkill by returning domain.ErrInvalidMove if the floor is
 // already cleared, and forbids killing monsters in the boss room.
 func (s *DungeonService) handleKillMonster(p *domain.Player, e domain.Event) error {
-	if p.CurrentFloor > s.cfg.Floors {
+	if p.CurrentFloor >= s.cfg.Floors {
 		return domain.ErrInvalidMove
 	}
 	if s.isFloorCleared(p, p.CurrentFloor) {
@@ -121,14 +121,14 @@ func (s *DungeonService) handleKillMonster(p *domain.Player, e domain.Event) err
 // It acts as a strict gatekeeper, ensuring all previous floors are fully
 // cleared of monsters before allowing entry.
 func (s *DungeonService) handleEnteredBoss(p *domain.Player, e domain.Event) error {
-	for i := 1; i <= s.cfg.Floors; i++ {
+	for i := 1; i < s.cfg.Floors; i++ {
 		if !s.isFloorCleared(p, i) {
 			return domain.ErrInvalidMove
 		}
 	}
 
 	s.updateCurrentFloorTime(p, e.Time)
-	p.CurrentFloor = s.cfg.Floors + 1
+	p.CurrentFloor = s.cfg.Floors
 	p.BossEnterTime = e.Time
 	return nil
 }
@@ -137,7 +137,7 @@ func (s *DungeonService) handleEnteredBoss(p *domain.Player, e domain.Event) err
 // It ensures this action only occurs on the designated boss floor and prevents
 // duplicate kills.
 func (s *DungeonService) handleKilledBoss(p *domain.Player, e domain.Event) error {
-	if p.CurrentFloor != s.cfg.Floors+1 {
+	if p.CurrentFloor != s.cfg.Floors {
 		return domain.ErrInvalidMove
 	}
 	if p.BossKilled {

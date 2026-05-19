@@ -3,54 +3,29 @@ package reporter
 import (
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/ilindan-dev/dungeon-log/internal/core/domain"
 )
 
-// BaseReporter implements ports.Reporter and writes to any io.Writer.
+// BaseReporter implements the ports.Reporter interface.
+// It routes event logs and final business reports to their respective writers.
 type BaseReporter struct {
-	out    io.Writer
-	closer io.Closer
+	logOut    io.Writer
+	reportOut io.Writer
 }
 
-// NewStdoutReporter creates a reporter that writes to os.Stdout.
-func NewStdoutReporter() *BaseReporter {
+// NewReporter creates a new reporter with specified writers for logs and reports.
+func NewReporter(logOut, reportOut io.Writer) *BaseReporter {
 	return &BaseReporter{
-		out:    os.Stdout,
-		closer: nil,
+		logOut:    logOut,
+		reportOut: reportOut,
 	}
-}
-
-// NewFileReporter creates a reporter that writes to a specified file path.
-// It opens the file for writing, creating it if necessary, and truncating it if it exists.
-func NewFileReporter(path string) (*BaseReporter, error) {
-	//nolint:gosec // This is a CLI tool, receiving file paths from the user is intended behavior
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open report file: %w", err)
-	}
-
-	return &BaseReporter{
-		out:    file,
-		closer: file,
-	}, nil
-}
-
-// Close ensures the file descriptor is released if a file is used.
-func (r *BaseReporter) Close() error {
-	if r.closer != nil {
-		return r.closer.Close()
-	}
-	return nil
 }
 
 // EmitIncoming formats and prints a valid action taken by a player.
 func (r *BaseReporter) EmitIncoming(e domain.Event) error {
-	timeStr := e.Time.Format("15:04:05")
-	msg := formatIncomingEvent(e)
-	_, err := fmt.Fprintf(r.out, "[%s] %s\n", timeStr, msg)
+	_, err := fmt.Fprintf(r.logOut, "[%s] %s\n", e.Time.Format(time.TimeOnly), formatIncomingEvent(e))
 	return err
 }
 
@@ -68,38 +43,24 @@ func (r *BaseReporter) EmitOutgoing(t time.Time, eventID domain.EventID, playerI
 		msg = fmt.Sprintf("Player [%d] makes imposible move [%s]", playerID, extra) // As it was in the task
 	}
 
-	_, err := fmt.Fprintf(r.out, "[%s] %s\n", timeStr, msg)
+	_, err := fmt.Fprintf(r.logOut, "[%s] %s\n", timeStr, msg)
 	return err
 }
 
 // PrintFinalReport calculates statistics and outputs the final summary for all players.
 func (r *BaseReporter) PrintFinalReport(players []*domain.Player) error {
-	if _, err := fmt.Fprintln(r.out, "Final report:"); err != nil {
+	if _, err := fmt.Fprintln(r.reportOut, "Final report:"); err != nil {
 		return err
 	}
 
 	for _, p := range players {
-		timeSpent := p.LeaveTime.Sub(p.EnterTime)
-		if p.State == domain.StateFail && !p.DeathTime.IsZero() {
-			timeSpent = p.DeathTime.Sub(p.EnterTime)
-		}
-
-		var totalFloorTime time.Duration
-		for _, d := range p.FloorClearTimes {
-			totalFloorTime += d
-		}
-		avgFloorTime := time.Duration(0)
-		if len(p.FloorClearTimes) > 0 {
-			avgFloorTime = totalFloorTime / time.Duration(len(p.FloorClearTimes))
-		}
-
 		statStr := fmt.Sprintf("[%s, %s, %s]",
-			formatDuration(timeSpent),
-			formatDuration(avgFloorTime),
+			formatDuration(p.TimeSpent),
+			formatDuration(p.AvgFloorClearTime),
 			formatDuration(p.BossKillTime),
 		)
 
-		if _, err := fmt.Fprintf(r.out, "[%s] %d %s HP:%d\n", p.State, p.ID, statStr, p.Health); err != nil {
+		if _, err := fmt.Fprintf(r.reportOut, "[%s] %d %s HP:%d\n", p.State, p.ID, statStr, p.Health); err != nil {
 			return err
 		}
 	}
