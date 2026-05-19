@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -16,6 +17,7 @@ func main() {
 	var configPath string
 	var eventsPath string
 	var outputPath string
+	var reportPath string
 
 	rootCmd := &cobra.Command{
 		Use:          "dungeon-log",
@@ -29,23 +31,38 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("failed to initialize parser: %w", err)
 			}
-			defer func() {
-				_ = p.Close()
-			}()
+			defer func() { _ = p.Close() }()
 
-			var r *reporter.BaseReporter
+			logOut := io.Writer(os.Stdout)
+			reportOut := io.Writer(os.Stdout)
+
 			if outputPath != "" {
-				r, err = reporter.NewFileReporter(outputPath)
+				//nolint:gosec // This is a CLI tool, receiving file paths from the user is intended behavior
+				fileLog, err := os.Create(outputPath)
 				if err != nil {
-					return fmt.Errorf("failed to initialize file reporter: %w", err)
+					return fmt.Errorf("failed to open output log file: %w", err)
 				}
-				defer func() { _ = r.Close() }()
-			} else {
-				r = reporter.NewStdoutReporter()
+				defer func() {
+					_ = fileLog.Close()
+				}()
+				logOut = fileLog
 			}
 
-			svc := service.NewDungeonService(cfg, p, r)
+			if reportPath != "" {
+				//nolint:gosec // This is a CLI tool, receiving file paths from the user is intended behavior
+				fileReport, err := os.Create(reportPath)
+				if err != nil {
+					return fmt.Errorf("failed to open report file: %w", err)
+				}
+				defer func() {
+					_ = fileReport.Close()
+				}()
+				reportOut = fileReport
+			}
 
+			r := reporter.NewReporter(logOut, reportOut)
+
+			svc := service.NewDungeonService(cfg, p, r)
 			if err := svc.Run(); err != nil {
 				return fmt.Errorf("application error: %w", err)
 			}
@@ -56,7 +73,8 @@ func main() {
 
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file (required)")
 	rootCmd.Flags().StringVarP(&eventsPath, "events", "e", "", "Path to events log file (required)")
-	rootCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Path to output file (default: stdout)")
+	rootCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Path to output stream file (default: stdout)")
+	rootCmd.Flags().StringVarP(&reportPath, "report", "r", "", "Path to final report file (default: stdout)")
 
 	_ = rootCmd.MarkFlagRequired("config")
 	_ = rootCmd.MarkFlagRequired("events")
