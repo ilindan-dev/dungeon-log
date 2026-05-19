@@ -44,6 +44,10 @@ type Player struct {
 	BossEnterTime time.Time
 	BossKilled    bool
 	BossKillTime  time.Duration
+
+	// Final report
+	TimeSpent         time.Duration
+	AvgFloorClearTime time.Duration
 }
 
 // IsDead returns true if the player's health has dropped to zero or below.
